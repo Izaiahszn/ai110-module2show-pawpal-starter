@@ -57,12 +57,32 @@ link, since that one blocked the scheduler from working at all.
 **a. Constraints and priorities**
 
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
+
+The scheduler considers the owner's total available minutes (a time budget), each
+task's priority (higher int = more important), each task's duration, and whether a
+task is already completed. Tasks also carry a scheduled time ("HH:MM") and a
+frequency ("once"/"daily"/"weekly").
+
 - How did you decide which constraints mattered most?
+
+Time budget and priority mattered most, because the core problem is "the owner only
+has so many minutes, so do the most important things first." `make_plan()` sorts by
+priority (shortest duration as a tiebreaker) and greedily fills the budget. Scheduled
+time is used for sorting and conflict detection rather than for the budget itself.
 
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
+
+My conflict detection (`Scheduler.detect_conflicts()`) only flags tasks that share the
+**exact same start time** ("HH:MM"). It does not account for overlapping durations —
+e.g. a 30-minute task at 08:00 and another at 08:15 overlap in real life, but my code
+does not warn about that. I chose exact-match because it is simple, fast (one pass,
+grouping by time string), and easy to read, and it catches the most common mistake:
+double-booking the same slot. For a lightweight pet-care helper that is a reasonable
+tradeoff; true interval-overlap detection (comparing start + duration ranges) would be
+the next improvement if the app needed it.
 
 ---
 

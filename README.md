@@ -44,24 +44,34 @@ pip install -r requirements.txt
 
 ## 🖥️ Sample Output
 
-Terminal output from running the CLI demo (`python main.py`), which builds a plan
-for an owner with a 60-minute budget across two pets:
+Terminal output from running the CLI demo (`python main.py`), which exercises the
+smarter-scheduling features (sorting, filtering, conflict detection, recurring tasks):
 
 ```
-Today's Schedule for Jordan
-===========================
-  08:00  Feeding (10 min)  [high] - food
-  08:10  Morning walk (30 min)  [high] - exercise
-  08:40  Litter box (15 min)  [medium] - cleaning
+=== All tasks, sorted by time ===
+  07:30  Feeding (10 min)
+  08:00  Morning walk (30 min)
+  08:00  Vet meds (5 min)
+  12:00  Midday play (20 min)
+  18:00  Evening walk (30 min)
 
-Total: 3 task(s), 55 of 60 min used.
+=== Filter: only Mochi's tasks ===
+  Evening walk @ 18:00
+  Morning walk @ 08:00
+  Midday play @ 12:00
 
-Why this plan for Jordan:
-  - Morning walk: scheduled (high priority, 30 min).
-  - Feeding: scheduled (high priority, 10 min).
-  - Give meds: skipped (already completed).
-  - Litter box: scheduled (medium priority, 15 min).
-  - Play/enrichment: skipped (no time left in the 60-min budget).
+=== Conflict detection ===
+  WARNING - conflict at 08:00: Morning walk, Vet meds
+
+=== Recurring task ===
+  Completed 'Morning walk' (daily). Next occurrence due: 2026-07-08
+
+=== Filter: pending (not completed) tasks ===
+  Evening walk @ 18:00 (due None)
+  Midday play @ 12:00 (due None)
+  Morning walk @ 08:00 (due 2026-07-08)
+  Feeding @ 07:30 (due None)
+  Vet meds @ 08:00 (due None)
 ```
 
 ## 🧪 Testing PawPal+
@@ -82,14 +92,12 @@ Sample test output:
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
-
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Task sorting | `Scheduler.sort_by_time()` | Sorts tasks by their "HH:MM" time; untimed tasks go last. Also `make_plan()` sorts by priority (duration as tiebreaker). |
+| Filtering | `Scheduler.filter_tasks(pet_name, completed)` | Filter by pet name and/or completion status; either argument is optional. |
+| Conflict handling | `Scheduler.detect_conflicts()` | Lightweight: warns when pending tasks share the **exact same** start time (returns messages, never raises). |
+| Recurring tasks | `Task.next_occurrence()`, `Pet.complete_task()`, `Scheduler.mark_task_complete()` | Completing a "daily"/"weekly" task auto-creates the next instance with `due_date` advanced via `timedelta`. |
 
 ## 📸 Demo Walkthrough
 
