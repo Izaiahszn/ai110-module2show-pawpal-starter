@@ -1,3 +1,5 @@
+from datetime import time as dtime
+
 import streamlit as st
 
 # Step 1: bring the logic layer into the UI.
@@ -9,9 +11,10 @@ st.title("🐾 PawPal+")
 
 # The UI uses friendly priority words; the logic layer uses ints (higher = more important).
 PRIORITY_TO_INT = {"low": 1, "medium": 2, "high": 3}
+PRIORITY_FROM_INT = {v: k for k, v in PRIORITY_TO_INT.items()}
 
 
-# Step 2: keep one Owner alive across reruns.
+# Keep one Owner alive across reruns.
 # Streamlit re-runs this script top-to-bottom on every interaction, so we store the
 # Owner in st.session_state (a dict-like "vault") and only create it once.
 def get_owner() -> Owner:
@@ -21,6 +24,7 @@ def get_owner() -> Owner:
 
 
 owner = get_owner()
+scheduler = Scheduler(owner)
 
 # --- Owner settings -------------------------------------------------------
 st.subheader("Owner")
@@ -33,7 +37,7 @@ owner.preferences = st.text_input("Preferences", value=owner.preferences)
 st.divider()
 
 # --- Add a pet ------------------------------------------------------------
-# Step 3: submitting this form calls Owner.add_pet(), which persists in session_state.
+# Submitting this form calls Owner.add_pet(), which persists in session_state.
 st.subheader("Add a pet")
 with st.form("add_pet", clear_on_submit=True):
     pet_name = st.text_input("Pet name", value="Mochi")
@@ -61,8 +65,10 @@ with st.form("add_task", clear_on_submit=True):
     col1, col2 = st.columns(2)
     with col1:
         duration = st.number_input("Duration (minutes)", min_value=1, max_value=240, value=20)
+        task_time = st.time_input("Time", value=dtime(8, 0))
     with col2:
         priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
+        frequency = st.selectbox("Frequency", ["once", "daily", "weekly"])
     if st.form_submit_button("Add task") and task_title:
         pet = next(p for p in owner.pets if p.name == chosen_pet)
         pet.add_task(
@@ -71,24 +77,36 @@ with st.form("add_task", clear_on_submit=True):
                 category=category,
                 duration=int(duration),
                 priority=PRIORITY_TO_INT[priority],
+                time=task_time.strftime("%H:%M"),
+                frequency=frequency,
             )
         )
         st.success(f"Added '{task_title}' to {chosen_pet}.")
 
-# Show the tasks currently held on each pet.
-all_tasks = owner.all_tasks()
-if all_tasks:
-    st.write("Current tasks:")
+# --- Conflict warnings (always shown when present) ------------------------
+# Scheduler.detect_conflicts() returns friendly messages; surface each as a warning
+# so a busy owner immediately sees double-booked time slots.
+conflicts = scheduler.detect_conflicts()
+for warning in conflicts:
+    st.warning(warning)
+
+# --- Current tasks, sorted by time ---------------------------------------
+# Use Scheduler.sort_by_time() so the table reads like a daily timeline.
+sorted_tasks = scheduler.sort_by_time()
+if sorted_tasks:
+    st.write("Current tasks (sorted by time):")
     st.table(
         [
             {
+                "time": t.time or "—",
                 "task": t.name,
                 "category": t.category,
                 "duration (min)": t.duration,
-                "priority": t.priority,
-                "done": t.completed,
+                "priority": PRIORITY_FROM_INT.get(t.priority, t.priority),
+                "frequency": t.frequency,
+                "done": "✓" if t.completed else "",
             }
-            for t in all_tasks
+            for t in sorted_tasks
         ]
     )
 else:
@@ -100,11 +118,13 @@ st.divider()
 # This button hands the Owner to the Scheduler and shows the plan + reasoning.
 st.subheader("Build Schedule")
 if st.button("Generate schedule"):
-    scheduler = Scheduler(owner)
+    if conflicts:
+        st.warning(f"Heads up: {len(conflicts)} time conflict(s) above — see warnings.")
     plan = scheduler.make_plan()
     if not plan:
         st.warning("No tasks fit in the available time. Add tasks or raise the time budget.")
     else:
+        st.success(f"Planned {len(plan)} task(s) within {owner.available_minutes} minutes.")
         st.code(scheduler.display_plan(), language="text")
         st.markdown("**Why this plan?**")
         st.code(scheduler.explain(), language="text")
